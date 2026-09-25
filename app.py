@@ -542,6 +542,9 @@ def cierre_mensual():
     return render_template("cierre_mensual.html", cierres=cierres)
 
 
+# Se ejecuta siempre al cargar el módulo (tanto con "python app.py" como con gunicorn),
+# para asegurar que las tablas existan en la base de Neon.
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
