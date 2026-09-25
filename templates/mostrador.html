@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Mostrador - {{ nombre_negocio }}{% endblock %}
+{% block header %}Mostrador / Ventas{% endblock %}
+{% block content %}
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>🧾 Registrar venta</h3>
+        <form method="POST">
+            <label>Producto</label>
+            <select name="producto_id" required>
+                {% for p in productos %}
+                <option value="{{ p.id }}">{{ p.nombre }} — ${{ "%.2f"|format(p.precio) }} (stock: {{ p.stock }})</option>
+                {% endfor %}
+            </select>
+            <label>Cantidad</label>
+            <input type="number" name="cantidad" min="1" value="1" required>
+            <label>Tipo de pago</label>
+            <select name="tipo_pago">
+                <option>Efectivo</option>
+                <option>Débito</option>
+                <option>Crédito</option>
+                <option>Transferencia</option>
+                <option>QR / Billetera virtual</option>
+            </select>
+            <button type="submit" class="btn">Registrar venta e imprimir ticket</button>
+        </form>
+    </div>
+    <div class="card">
+        <h3>📦 Stock disponible</h3>
+        <table>
+            <thead><tr><th>Producto</th><th>Precio</th><th>Stock</th></tr></thead>
+            <tbody>
+            {% for p in productos %}
+                <tr>
+                    <td>{{ p.nombre }}</td>
+                    <td>${{ "%.2f"|format(p.precio) }}</td>
+                    <td>
+                        {% if p.stock <= p.stock_minimo %}
+                            <span class="badge danger">{{ p.stock }} — bajo</span>
+                        {% else %}
+                            <span class="badge ok">{{ p.stock }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

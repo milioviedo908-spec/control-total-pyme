@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Socios - {{ nombre_negocio }}{% endblock %}
+{% block header %}Socios y Distribución de Utilidades{% endblock %}
+{% block content %}
+
+<div class="card metric" style="margin-bottom:20px;">
+    <div class="label">Ganancia neta acumulada</div>
+    <div class="value">${{ "%.2f"|format(ganancia_neta) }}</div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>➕ Agregar socio</h3>
+        <form method="POST">
+            <input type="hidden" name="accion" value="add">
+            <label>Nombre</label>
+            <input type="text" name="nombre" required>
+            <label>Porcentaje de participación (%)</label>
+            <input type="number" step="0.01" name="porcentaje" required>
+            <button type="submit" class="btn">Agregar</button>
+        </form>
+        {% if total_porcentaje != 100 %}
+        <p style="margin-top:14px; font-size:0.82rem; color:{{ 'var(--rojo)' if total_porcentaje > 100 else 'var(--amarillo)' }};">
+            ⚠️ El total de participación es {{ total_porcentaje }}% (debería sumar 100%).
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>CapTable</h3>
+        <table>
+            <thead><tr><th>Socio</th><th>Participación</th><th></th></tr></thead>
+            <tbody>
+            {% for s in socios %}
+                <tr>
+                    <td>{{ s.nombre }}</td>
+                    <td>
+                        {{ s.porcentaje }}%
+                        <div class="progress-bar"><span style="width:{{ s.porcentaje }}%;"></span></div>
+                    </td>
+                    <td><form method="POST"><input type="hidden" name="accion" value="del"><input type="hidden" name="id" value="{{ s.id }}"><button class="btn sm danger">✕</button></form></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <h3>💸 Distribución de la ganancia neta</h3>
+    <table>
+        <thead><tr><th>Socio</th><th>Participación</th><th>Monto a distribuir</th></tr></thead>
+        <tbody>
+        {% for d in distribucion %}
+            <tr>
+                <td>{{ d.nombre }}</td>
+                <td>{{ d.porcentaje }}%</td>
+                <td>${{ "%.2f"|format(d.monto) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
