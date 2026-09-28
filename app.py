@@ -78,6 +78,20 @@ def init_db(force=False):
             [("Socio 1", 60), ("Socio 2", 40)],
         )
         conn.commit()
+
+    # Migración: agrega columnas nuevas a bases ya existentes sin perder datos.
+    columnas_nuevas = [
+        "total_activos NUMERIC(12,2)",
+        "total_pasivos NUMERIC(12,2)",
+        "patrimonio_neto NUMERIC(12,2)",
+        "total_costos_fijos NUMERIC(12,2)",
+        "total_costos_variables NUMERIC(12,2)",
+    ]
+    for columna in columnas_nuevas:
+        nombre_col = columna.split()[0]
+        cur.execute(f"ALTER TABLE cierres_mensuales ADD COLUMN IF NOT EXISTS {columna}")
+    conn.commit()
+
     cur.close()
     conn.close()
 
@@ -540,19 +554,57 @@ def cierre_mensual():
     conn = get_db()
     if request.method == "POST":
         periodo = ahora().strftime("%Y-%m")
+
         ingresos = float(conn_execute(conn, "SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_caja WHERE tipo='ingreso'").fetchone()["s"])
         egresos = float(conn_execute(conn, "SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_caja WHERE tipo='egreso'").fetchone()["s"])
         ganancia = ingresos - egresos
+
+        activos = conn_execute(conn, "SELECT * FROM activos").fetchall()
+        pasivos = conn_execute(conn, "SELECT * FROM pasivos").fetchall()
+        total_activos = sum(float(a["monto"]) for a in activos)
+        total_pasivos = sum(float(p["monto"]) for p in pasivos)
+        patrimonio_neto = total_activos - total_pasivos
+
+        costos = conn_execute(conn, "SELECT * FROM costos_fijos").fetchall()
+        total_costos_fijos = sum(float(c["monto"]) for c in costos if c["tipo"] == "fijo")
+        total_costos_variables = sum(float(c["monto"]) for c in costos if c["tipo"] == "variable")
+
+        # 1) Guardar la foto completa del mes que se cierra.
         conn_execute(
             conn,
-            "INSERT INTO cierres_mensuales (periodo, ingresos_totales, egresos_totales, ganancia_neta, fecha_cierre) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            (periodo, ingresos, egresos, ganancia, ahora().strftime("%Y-%m-%d %H:%M:%S")),
+            "INSERT INTO cierres_mensuales "
+            "(periodo, ingresos_totales, egresos_totales, ganancia_neta, "
+            "total_activos, total_pasivos, patrimonio_neto, total_costos_fijos, total_costos_variables, fecha_cierre) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                periodo, ingresos, egresos, ganancia,
+                total_activos, total_pasivos, patrimonio_neto,
+                total_costos_fijos, total_costos_variables,
+                ahora().strftime("%Y-%m-%d %H:%M:%S"),
+            ),
         )
+
+        # 2) Reiniciar todo para arrancar el mes siguiente en cero.
+        #    El stock de productos y los socios (CapTable) NO se tocan.
+        conn_execute(conn, "DELETE FROM venta_items")
+        conn_execute(conn, "DELETE FROM ventas")
+        conn_execute(conn, "DELETE FROM movimientos_caja")
+        conn_execute(conn, "DELETE FROM activos")
+        conn_execute(conn, "DELETE FROM pasivos")
+        conn_execute(conn, "DELETE FROM costos_fijos")
+
         conn.commit()
         conn.close()
-        registrar_historial(session.get("usuario_nombre"), "Cierre mensual generado", periodo, ganancia)
-        flash(f"Cierre del período {periodo} generado correctamente.", "success")
+        registrar_historial(
+            session.get("usuario_nombre"),
+            "Cierre mensual generado (reinicio de ventas, caja, finanzas y costos)",
+            periodo,
+            ganancia,
+        )
+        flash(
+            f"Cierre del período {periodo} guardado. Ventas, flujo de caja, estructura financiera y costos se reiniciaron para el nuevo mes.",
+            "success",
+        )
         return redirect(url_for("cierre_mensual"))
 
     cierres = conn_execute(conn, "SELECT * FROM cierres_mensuales ORDER BY id DESC").fetchall()
