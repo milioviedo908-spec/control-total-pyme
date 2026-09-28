@@ -11,7 +11,9 @@
         pasivos y costos, para arrancar el mes siguiente limpio.
     </p>
     <p style="font-size:0.82rem; color:var(--rojo); font-weight:600;">
-        El stock de productos y los socios (CapTable) no se tocan. Esta acción no se puede deshacer.
+        La cantidad de stock y los productos no se borran, pero el costo de cada producto vuelve a $0
+        (la valorización queda en $0 hasta que cargues el costo de nuevo). Los socios (CapTable) no se tocan.
+        Esta acción no se puede deshacer.
     </p>
     <form method="POST" onsubmit="return confirm('¿Generar el cierre y reiniciar ventas, caja, finanzas y costos? Esta acción no se puede deshacer.');">
         <button type="submit" class="btn danger">Generar cierre y reiniciar mes</button>
@@ -28,6 +30,7 @@
                 <th>Egresos</th>
                 <th>Ganancia Neta</th>
                 <th>Patrimonio Neto</th>
+                <th>Valorización Stock</th>
                 <th>Costos Fijos</th>
                 <th>Costos Variables</th>
                 <th>Fecha de cierre</th>
@@ -41,6 +44,7 @@
                 <td>${{ "%.2f"|format(c.egresos_totales) }}</td>
                 <td>${{ "%.2f"|format(c.ganancia_neta) }}</td>
                 <td>{% if c.patrimonio_neto is not none %}${{ "%.2f"|format(c.patrimonio_neto) }}{% else %}—{% endif %}</td>
+                <td>{% if c.valor_stock is not none %}${{ "%.2f"|format(c.valor_stock) }}{% else %}—{% endif %}</td>
                 <td>{% if c.total_costos_fijos is not none %}${{ "%.2f"|format(c.total_costos_fijos) }}{% else %}—{% endif %}</td>
                 <td>{% if c.total_costos_variables is not none %}${{ "%.2f"|format(c.total_costos_variables) }}{% else %}—{% endif %}</td>
                 <td>{{ c.fecha_cierre }}</td>
