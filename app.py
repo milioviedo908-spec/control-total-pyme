@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from functools import wraps
 import psycopg2
 import psycopg2.extras
@@ -8,6 +9,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_URL = os.environ.get("DATABASE_URL")  # URL de conexión de Neon
+ZONA_HORARIA = ZoneInfo(os.environ.get("TZ_NEGOCIO", "America/Argentina/Cordoba"))
+
+
+def ahora():
+    """Fecha y hora actual en la zona horaria del negocio (el servidor corre en UTC)."""
+    return datetime.now(ZONA_HORARIA)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
@@ -80,7 +87,7 @@ def registrar_historial(usuario, accion, detalle="", monto=None):
     conn_execute(
         conn,
         "INSERT INTO historial (fecha, usuario, accion, detalle, monto) VALUES (%s, %s, %s, %s, %s)",
-        (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), usuario, accion, detalle, monto),
+        (ahora().strftime("%Y-%m-%d %H:%M:%S"), usuario, accion, detalle, monto),
     )
     conn.commit()
     conn.close()
@@ -196,7 +203,7 @@ def mostrador():
             flash(f"Stock insuficiente de {producto['nombre']} (disponible: {producto['stock']}).", "error")
         else:
             total = float(producto["precio"]) * cantidad
-            fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            fecha = ahora().strftime("%Y-%m-%d %H:%M:%S")
             venta_id = conn_execute(
                 conn,
                 "INSERT INTO ventas (fecha, total, usuario, tipo_pago) VALUES (%s, %s, %s, %s) RETURNING id",
@@ -244,7 +251,7 @@ def ticket(venta_id):
 @login_required(roles=["privado"])
 def dashboard():
     conn = get_db()
-    hoy = datetime.now()
+    hoy = ahora()
     hace_7 = (hoy - timedelta(days=7)).strftime("%Y-%m-%d")
     hace_14 = (hoy - timedelta(days=14)).strftime("%Y-%m-%d")
 
@@ -328,9 +335,9 @@ def finanzas():
             )
             registrar_historial(session.get("usuario_nombre"), "Pasivo agregado", request.form["nombre"], float(request.form["monto"]))
         elif accion == "del_activo":
-            conn_execute(conn, "DELETE FROM activos WHERE id = %s", (request.form["id"],))
+            conn_execute(conn, "DELETE FROM activos WHERE id = %s", (int(request.form["id"]),))
         elif accion == "del_pasivo":
-            conn_execute(conn, "DELETE FROM pasivos WHERE id = %s", (request.form["id"],))
+            conn_execute(conn, "DELETE FROM pasivos WHERE id = %s", (int(request.form["id"]),))
         conn.commit()
         conn.close()
         return redirect(url_for("finanzas"))
@@ -357,7 +364,7 @@ def finanzas():
 def flujo_caja():
     conn = get_db()
     if request.method == "POST":
-        fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        fecha = ahora().strftime("%Y-%m-%d %H:%M:%S")
         tipo = request.form["tipo"]
         categoria = request.form["categoria"]
         monto = float(request.form["monto"])
@@ -397,7 +404,7 @@ def costos():
                 (request.form["nombre"], float(request.form["monto"]), request.form["periodicidad"], request.form["tipo"]),
             )
         elif accion == "del":
-            conn_execute(conn, "DELETE FROM costos_fijos WHERE id = %s", (request.form["id"],))
+            conn_execute(conn, "DELETE FROM costos_fijos WHERE id = %s", (int(request.form["id"]),))
         conn.commit()
         conn.close()
         return redirect(url_for("costos"))
@@ -449,11 +456,22 @@ def stock():
             conn_execute(
                 conn,
                 "UPDATE productos SET stock = %s WHERE id = %s",
-                (int(request.form["nuevo_stock"]), request.form["id"]),
+                (int(request.form["nuevo_stock"]), int(request.form["id"])),
             )
             registrar_historial(session.get("usuario_nombre"), "Ajuste de stock", f"Producto ID {request.form['id']}")
         elif accion == "del":
-            conn_execute(conn, "DELETE FROM productos WHERE id = %s", (request.form["id"],))
+            try:
+                conn_execute(conn, "DELETE FROM productos WHERE id = %s", (int(request.form["id"]),))
+                conn.commit()
+            except psycopg2.errors.ForeignKeyViolation:
+                conn.rollback()
+                flash(
+                    "No se puede eliminar este producto porque ya tiene ventas registradas. "
+                    "Si no lo vendés más, poné su stock en 0 en lugar de borrarlo.",
+                    "error",
+                )
+            conn.close()
+            return redirect(url_for("stock"))
         conn.commit()
         conn.close()
         return redirect(url_for("stock"))
@@ -478,7 +496,7 @@ def socios():
                 (request.form["nombre"], float(request.form["porcentaje"])),
             )
         elif accion == "del":
-            conn_execute(conn, "DELETE FROM socios WHERE id = %s", (request.form["id"],))
+            conn_execute(conn, "DELETE FROM socios WHERE id = %s", (int(request.form["id"]),))
         conn.commit()
         conn.close()
         return redirect(url_for("socios"))
@@ -521,7 +539,7 @@ def historial():
 def cierre_mensual():
     conn = get_db()
     if request.method == "POST":
-        periodo = datetime.now().strftime("%Y-%m")
+        periodo = ahora().strftime("%Y-%m")
         ingresos = float(conn_execute(conn, "SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_caja WHERE tipo='ingreso'").fetchone()["s"])
         egresos = float(conn_execute(conn, "SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_caja WHERE tipo='egreso'").fetchone()["s"])
         ganancia = ingresos - egresos
@@ -529,7 +547,7 @@ def cierre_mensual():
             conn,
             "INSERT INTO cierres_mensuales (periodo, ingresos_totales, egresos_totales, ganancia_neta, fecha_cierre) "
             "VALUES (%s, %s, %s, %s, %s)",
-            (periodo, ingresos, egresos, ganancia, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            (periodo, ingresos, egresos, ganancia, ahora().strftime("%Y-%m-%d %H:%M:%S")),
         )
         conn.commit()
         conn.close()
