@@ -3,46 +3,8 @@
 {% block header %}Flujo de Caja Diario{% endblock %}
 {% block content %}
 
-<div class="grid grid-3" style="margin-bottom:20px;">
-    <div class="card metric"><div class="label">Ingresos totales</div><div class="value" style="color:var(--verde);">${{ "%.2f"|format(ingresos) }}</div></div>
-    <div class="card metric"><div class="label">Egresos totales</div><div class="value" style="color:var(--rojo);">${{ "%.2f"|format(egresos) }}</div></div>
-    <div class="card metric"><div class="label">Saldo</div><div class="value">${{ "%.2f"|format(saldo) }}</div></div>
-</div>
-
-<div class="grid grid-2">
-    <div class="card">
-        <h3>➕ Registrar movimiento</h3>
-        <form method="POST">
-            <label>Tipo</label>
-            <select name="tipo" required>
-                <option value="ingreso">Ingreso</option>
-                <option value="egreso">Egreso</option>
-            </select>
-            <label>Categoría</label>
-            <input type="text" name="categoria" placeholder="Ej: Venta, Alquiler, Insumos" required>
-            <label>Monto</label>
-            <input type="number" step="0.01" name="monto" required>
-            <label>Descripción</label>
-            <input type="text" name="descripcion" placeholder="Opcional">
-            <button type="submit" class="btn">Registrar</button>
-        </form>
-    </div>
-    <div class="card">
-        <h3>Últimos movimientos</h3>
-        <table>
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Monto</th></tr></thead>
-            <tbody>
-            {% for m in movimientos %}
-                <tr>
-                    <td>{{ m.fecha }}</td>
-                    <td>{% if m.tipo == 'ingreso' %}<span class="badge ok">Ingreso</span>{% else %}<span class="badge danger">Egreso</span>{% endif %}</td>
-                    <td>{{ m.categoria }}</td>
-                    <td>${{ "%.2f"|format(m.monto) }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-{% endblock %}
+<div class="grid grid-3" style="margin-bottom:20px;"> <div class="card metric"><div class="label">Ingresos totales</div><div class="value" style="color:var(--verde);">${{ "%.2f"|format(ingresos) }}</div></div> <div class="card metric"><div class="label">Egresos totales</div><div class="value" style="color:var(--rojo);">${{ "%.2f"|format(egresos) }}</div></div> <div class="card metric"><div class="label">Saldo</div><div class="value">${{ "%.2f"|format(saldo) }}</div></div>
+</div> <div class="grid grid-2"> <div class="card"> <h3>Registrar movimiento</h3> <form method="POST"> <label>Tipo</label> <select name="tipo" required> <option value="ingreso">Ingreso</option> <option value="egreso">Egreso</option> </select> <label>Categoría</label> <input type="text" name="categoria" placeholder="Ej: Venta, Alquiler, Insumos" required> <label>Monto</label> <input type="number" step="0.01" name="monto" required> <label>Descripción</label> <input type="text" name="descripcion" placeholder="Opcional"> <button type="submit" class="btn">Registrar</button> </form> </div> <div class="card"> <h3>Últimos movimientos</h3> <table> <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Monto</th></tr></thead> <tbody> {% for m in movimientos %}
+                <tr> <td>{{ m.fecha }}</td> <td>{% if m.tipo == 'ingreso' %}<span class="badge ok">Ingreso</span>{% else %}<span class="badge danger">Egreso</span>{% endif %}</td> <td>{{ m.categoria }}</td> <td>${{ "%.2f"|format(m.monto) }}</td> </tr> {% endfor %}
+            </tbody> </table> </div>
+</div> {% endblock %}

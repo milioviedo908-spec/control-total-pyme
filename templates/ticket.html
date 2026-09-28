@@ -3,27 +3,8 @@
 {% block header %}Ticket #{{ venta.id }}{% endblock %}
 {% block content %}
 
-<div class="ticket-preview">
-    <p style="text-align:center; font-weight:700;">{{ nombre_negocio }}</p>
-    <p style="text-align:center; font-size:0.8rem; color:var(--texto-suave);">{{ venta.fecha }}</p>
-    <hr>
-    {% for item in items %}
-    <div style="display:flex; justify-content:space-between; font-size:0.88rem; margin-bottom:4px;">
-        <span>{{ item.producto_nombre }} x{{ item.cantidad }}</span>
-        <span>${{ "%.2f"|format(item.precio_unitario * item.cantidad) }}</span>
-    </div>
-    {% endfor %}
-    <hr>
-    <div style="display:flex; justify-content:space-between;">
-        <span>TOTAL</span>
-        <span class="total">${{ "%.2f"|format(venta.total) }}</span>
-    </div>
-    <p style="text-align:center; font-size:0.78rem; color:var(--texto-suave); margin-top:10px;">Pago: {{ venta.tipo_pago }}</p>
-</div>
-
-<div style="text-align:center; margin-top:20px;">
-    <button onclick="window.print()" class="btn">🖨️ Imprimir</button>
-    <a href="{{ url_for('mostrador') }}" class="btn secondary">Nueva venta</a>
-</div>
-
-{% endblock %}
+<div class="ticket-preview"> <p style="text-align:center; font-weight:700;">{{ nombre_negocio }}</p> <p style="text-align:center; font-size:0.8rem; color:var(--texto-suave);">{{ venta.fecha }}</p> <hr> {% for item in items %}
+    <div style="display:flex; justify-content:space-between; font-size:0.88rem; margin-bottom:4px;"> <span>{{ item.producto_nombre }} x{{ item.cantidad }}</span> <span>${{ "%.2f"|format(item.precio_unitario * item.cantidad) }}</span> </div> {% endfor %}
+    <hr> <div style="display:flex; justify-content:space-between;"> <span>TOTAL</span> <span class="total">${{ "%.2f"|format(venta.total) }}</span> </div> <p style="text-align:center; font-size:0.78rem; color:var(--texto-suave); margin-top:10px;">Pago: {{ venta.tipo_pago }}</p>
+</div> <div style="text-align:center; margin-top:20px;"> <button onclick="window.print()" class="btn"> Imprimir</button> <a href="{{ url_for('mostrador') }}" class="btn secondary">Nueva venta</a>
+</div> {% endblock %}

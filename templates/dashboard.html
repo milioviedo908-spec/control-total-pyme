@@ -3,62 +3,15 @@
 {% block header %}Dashboard Ejecutivo{% endblock %}
 {% block content %}
 
-<div class="grid grid-4">
-    <div class="card metric">
-        <div class="icon">📈</div>
-        <div class="label">Ventas por semana</div>
-        <div class="value">${{ "%.2f"|format(ventas_semana) }}</div>
-        <div class="delta {{ 'up' if variacion >= 0 else 'down' }}">
-            {{ '+' if variacion >= 0 else '' }}{{ variacion }}% vs. semana anterior
-        </div>
+<div class="grid grid-4"> <div class="card metric"> <div class="icon"></div> <div class="label">Ventas por semana</div> <div class="value">${{ "%.2f"|format(ventas_semana) }}</div> <div class="delta {{ 'up' if variacion >= 0 else 'down' }}"> {{ '+' if variacion >= 0 else '' }}{{ variacion }}% vs. semana anterior
+        </div> </div> <div class="card metric"> <div class="icon"></div> <div class="label">Producto Top</div> <div class="value" style="font-size:1.2rem;">{{ producto_top }}</div> <div class="delta">Mayor rotación en inventario</div> </div> <div class="card metric"> <div class="icon"></div> <div class="label">Ticket Promedio</div> <div class="value">${{ "%.2f"|format(ticket_promedio) }}</div> <div class="delta">Gasto medio por venta (últimos 7 días)</div> </div> <div class="card metric"> <div class="icon"></div> <div class="label">Caja Disponible</div> <div class="value">${{ "%.2f"|format(caja_disponible) }}</div> <div class="delta">Liquidez en tiempo real</div> </div>
+</div> <div class="grid grid-2" style="margin-top:20px;"> <div class="card"> <h3>Ventas — últimos 7 días</h3> <canvas id="graficoVentas" height="160"></canvas> </div> <div class="card"> <h3> Alertas de stock mínimo</h3> {% if stock_bajo %}
+        <table> <thead><tr><th>Producto</th><th>Stock</th><th>Mínimo</th></tr></thead> <tbody> {% for p in stock_bajo %}
+                <tr> <td>{{ p.nombre }}</td> <td>{{ p.stock }}</td> <td>{{ p.stock_minimo }}</td> </tr> {% endfor %}
+            </tbody> </table> {% else %}
+        <p style="color:var(--texto-suave); font-size:0.9rem;">Todo el stock está en niveles saludables.</p> {% endif %}
     </div>
-    <div class="card metric">
-        <div class="icon">🏆</div>
-        <div class="label">Producto Top</div>
-        <div class="value" style="font-size:1.2rem;">{{ producto_top }}</div>
-        <div class="delta">Mayor rotación en inventario</div>
-    </div>
-    <div class="card metric">
-        <div class="icon">🧾</div>
-        <div class="label">Ticket Promedio</div>
-        <div class="value">${{ "%.2f"|format(ticket_promedio) }}</div>
-        <div class="delta">Gasto medio por venta (últimos 7 días)</div>
-    </div>
-    <div class="card metric">
-        <div class="icon">💰</div>
-        <div class="label">Caja Disponible</div>
-        <div class="value">${{ "%.2f"|format(caja_disponible) }}</div>
-        <div class="delta">Liquidez en tiempo real</div>
-    </div>
-</div>
-
-<div class="grid grid-2" style="margin-top:20px;">
-    <div class="card">
-        <h3>Ventas — últimos 7 días</h3>
-        <canvas id="graficoVentas" height="160"></canvas>
-    </div>
-    <div class="card">
-        <h3>⚠️ Alertas de stock mínimo</h3>
-        {% if stock_bajo %}
-        <table>
-            <thead><tr><th>Producto</th><th>Stock</th><th>Mínimo</th></tr></thead>
-            <tbody>
-            {% for p in stock_bajo %}
-                <tr>
-                    <td>{{ p.nombre }}</td>
-                    <td>{{ p.stock }}</td>
-                    <td>{{ p.stock_minimo }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p style="color:var(--texto-suave); font-size:0.9rem;">✅ Todo el stock está en niveles saludables.</p>
-        {% endif %}
-    </div>
-</div>
-
-{% endblock %}
+</div> {% endblock %}
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script>

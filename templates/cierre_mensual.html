@@ -3,32 +3,9 @@
 {% block header %}Cierre Mensual e Informes Históricos{% endblock %}
 {% block content %}
 
-<div class="card" style="margin-bottom:20px;">
-    <h3>Generar cierre del período actual</h3>
-    <p style="font-size:0.88rem; color:var(--texto-suave);">
-        Se calculará el corte de caja con los ingresos y egresos acumulados hasta la fecha y quedará guardado en el historial de informes.
-    </p>
-    <form method="POST">
-        <button type="submit" class="btn">📅 Generar cierre de {{ "" }}<span id="mesActual"></span></button>
-    </form>
-</div>
-
-<div class="card">
-    <h3>Informes históricos</h3>
-    <table>
-        <thead><tr><th>Período</th><th>Ingresos</th><th>Egresos</th><th>Ganancia Neta</th><th>Fecha de cierre</th></tr></thead>
-        <tbody>
-        {% for c in cierres %}
-            <tr>
-                <td>{{ c.periodo }}</td>
-                <td>${{ "%.2f"|format(c.ingresos_totales) }}</td>
-                <td>${{ "%.2f"|format(c.egresos_totales) }}</td>
-                <td>${{ "%.2f"|format(c.ganancia_neta) }}</td>
-                <td>{{ c.fecha_cierre }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-{% endblock %}
+<div class="card" style="margin-bottom:20px;"> <h3>Generar cierre del período actual</h3> <p style="font-size:0.88rem; color:var(--texto-suave);"> Se calculará el corte de caja con los ingresos y egresos acumulados hasta la fecha y quedará guardado en el historial de informes.
+    </p> <form method="POST"> <button type="submit" class="btn">Generar cierre de {{ "" }}<span id="mesActual"></span></button> </form>
+</div> <div class="card"> <h3>Informes históricos</h3> <table> <thead><tr><th>Período</th><th>Ingresos</th><th>Egresos</th><th>Ganancia Neta</th><th>Fecha de cierre</th></tr></thead> <tbody> {% for c in cierres %}
+            <tr> <td>{{ c.periodo }}</td> <td>${{ "%.2f"|format(c.ingresos_totales) }}</td> <td>${{ "%.2f"|format(c.egresos_totales) }}</td> <td>${{ "%.2f"|format(c.ganancia_neta) }}</td> <td>{{ c.fecha_cierre }}</td> </tr> {% endfor %}
+        </tbody> </table>
+</div> {% endblock %}

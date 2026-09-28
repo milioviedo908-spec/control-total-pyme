@@ -7,15 +7,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-<div class="access-screen">
-    <div class="access-box">
-        <h1>Control Total PyME</h1>
-        <p>Elegí cómo querés ingresar</p>
-        <div class="access-options">
-            <a href="{{ url_for('acceso_pin') }}">🧾 Modo Mostrador<small>Acceso rápido con PIN para registrar ventas</small></a>
-            <a href="{{ url_for('acceso_admin') }}">🔐 Modo Administrador<small>Email y contraseña — panel financiero completo</small></a>
-        </div>
-    </div>
+<div class="access-screen"> <div class="access-box"> <h1>Control Total PyME</h1> <p>Elegí cómo querés ingresar</p> <div class="access-options"> <a href="{{ url_for('acceso_pin') }}">Modo Mostrador<small>Acceso rápido con PIN para registrar ventas</small></a> <a href="{{ url_for('acceso_admin') }}">Modo Administrador<small>Email y contraseña — panel financiero completo</small></a> </div> </div>
 </div>
 </body>
 </html>

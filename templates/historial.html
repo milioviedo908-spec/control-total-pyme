@@ -3,21 +3,7 @@
 {% block header %}Historial de Movimientos (Auditoría){% endblock %}
 {% block content %}
 
-<div class="card">
-    <table>
-        <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>Monto</th></tr></thead>
-        <tbody>
-        {% for r in registros %}
-            <tr>
-                <td>{{ r.fecha }}</td>
-                <td>{{ r.usuario }}</td>
-                <td>{{ r.accion }}</td>
-                <td>{{ r.detalle }}</td>
-                <td>{% if r.monto %}${{ "%.2f"|format(r.monto) }}{% endif %}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-{% endblock %}
+<div class="card"> <table> <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>Monto</th></tr></thead> <tbody> {% for r in registros %}
+            <tr> <td>{{ r.fecha }}</td> <td>{{ r.usuario }}</td> <td>{{ r.accion }}</td> <td>{{ r.detalle }}</td> <td>{% if r.monto %}${{ "%.2f"|format(r.monto) }}{% endif %}</td> </tr> {% endfor %}
+        </tbody> </table>
+</div> {% endblock %}

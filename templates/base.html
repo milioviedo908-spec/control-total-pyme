@@ -8,40 +8,15 @@
 {% block head %}{% endblock %}
 </head>
 <body>
-<div class="app-shell">
-    <aside class="sidebar">
-        <div class="brand">Control <span>Total</span> PyME</div>
-        <nav>
-            {% if rol_actual == 'privado' %}
-            <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">📊 Dashboard</a>
-            <a href="{{ url_for('mostrador') }}" class="{{ 'active' if request.endpoint in ['mostrador','ticket'] }}">🧾 Mostrador / Ventas</a>
-            <a href="{{ url_for('stock') }}" class="{{ 'active' if request.endpoint == 'stock' }}">📦 Stock</a>
-            <a href="{{ url_for('flujo_caja') }}" class="{{ 'active' if request.endpoint == 'flujo_caja' }}">💵 Flujo de Caja</a>
-            <a href="{{ url_for('finanzas') }}" class="{{ 'active' if request.endpoint == 'finanzas' }}">🏦 Estructura Financiera</a>
-            <a href="{{ url_for('costos') }}" class="{{ 'active' if request.endpoint == 'costos' }}">📉 Costos y Punto de Equilibrio</a>
-            <a href="{{ url_for('socios') }}" class="{{ 'active' if request.endpoint == 'socios' }}">🤝 Socios (CapTable)</a>
-            <a href="{{ url_for('cierre_mensual') }}" class="{{ 'active' if request.endpoint == 'cierre_mensual' }}">📅 Cierre Mensual</a>
-            <a href="{{ url_for('historial') }}" class="{{ 'active' if request.endpoint == 'historial' }}">🕘 Historial</a>
-            {% else %}
-            <a href="{{ url_for('mostrador') }}" class="{{ 'active' if request.endpoint in ['mostrador','ticket'] }}">🧾 Mostrador</a>
-            {% endif %}
-        </nav>
-        <a href="{{ url_for('logout') }}" class="logout">⏻ Cerrar sesión</a>
-    </aside>
-    <div class="main">
-        <div class="topbar">
-            <h1>{% block header %}{{ nombre_negocio }}{% endblock %}</h1>
-            <span class="user-chip">{{ usuario_actual }} · {{ 'Administrador' if rol_actual == 'privado' else 'Mostrador' }}</span>
-        </div>
-        <div class="content">
-            {% with messages = get_flashed_messages(with_categories=true) %}
+<div class="app-shell"> <aside class="sidebar"> <div class="brand">Control <span>Total</span> PyME</div> <nav> {% if rol_actual == 'privado' %}
+            <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a> <a href="{{ url_for('mostrador') }}" class="{{ 'active' if request.endpoint in ['mostrador','ticket'] }}">Mostrador / Ventas</a> <a href="{{ url_for('stock') }}" class="{{ 'active' if request.endpoint == 'stock' }}">Stock</a> <a href="{{ url_for('flujo_caja') }}" class="{{ 'active' if request.endpoint == 'flujo_caja' }}">Flujo de Caja</a> <a href="{{ url_for('finanzas') }}" class="{{ 'active' if request.endpoint == 'finanzas' }}">Estructura Financiera</a> <a href="{{ url_for('costos') }}" class="{{ 'active' if request.endpoint == 'costos' }}">Costos y Punto de Equilibrio</a> <a href="{{ url_for('socios') }}" class="{{ 'active' if request.endpoint == 'socios' }}">Socios (CapTable)</a> <a href="{{ url_for('cierre_mensual') }}" class="{{ 'active' if request.endpoint == 'cierre_mensual' }}">Cierre Mensual</a> <a href="{{ url_for('historial') }}" class="{{ 'active' if request.endpoint == 'historial' }}">Historial</a> {% else %}
+            <a href="{{ url_for('mostrador') }}" class="{{ 'active' if request.endpoint in ['mostrador','ticket'] }}">Mostrador</a> {% endif %}
+        </nav> <a href="{{ url_for('logout') }}" class="logout">Cerrar sesión</a> </aside> <div class="main"> <div class="topbar"> <h1>{% block header %}{{ nombre_negocio }}{% endblock %}</h1> <span class="user-chip">{{ usuario_actual }} · {{ 'Administrador' if rol_actual == 'privado' else 'Mostrador' }}</span> </div> <div class="content"> {% with messages = get_flashed_messages(with_categories=true) %}
                 {% for category, message in messages %}
-                    <div class="flash {{ category }}">{{ message }}</div>
-                {% endfor %}
+                    <div class="flash {{ category }}">{{ message }}</div> {% endfor %}
             {% endwith %}
             {% block content %}{% endblock %}
-        </div>
-    </div>
+        </div> </div>
 </div>
 {% block scripts %}{% endblock %}
 </body>

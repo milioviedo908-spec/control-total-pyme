@@ -3,74 +3,14 @@
 {% block header %}Costos, Alquileres y Punto de Equilibrio{% endblock %}
 {% block content %}
 
-<div class="grid grid-3" style="margin-bottom:20px;">
-    <div class="card metric"><div class="label">Costos Fijos (mensual)</div><div class="value">${{ "%.2f"|format(total_fijos) }}</div></div>
-    <div class="card metric"><div class="label">Costos Variables</div><div class="value">${{ "%.2f"|format(total_variables) }}</div></div>
-    <div class="card metric">
-        <div class="label">Punto de Equilibrio</div>
-        {% if punto_equilibrio_unidades %}
-        <div class="value">{{ punto_equilibrio_unidades|round(0) }} u.</div>
-        <div class="delta">Con margen promedio de ${{ "%.2f"|format(margen_promedio) }} por unidad</div>
-        {% else %}
-        <div class="value" style="font-size:1rem;">Cargá productos con margen positivo</div>
-        {% endif %}
+<div class="grid grid-3" style="margin-bottom:20px;"> <div class="card metric"><div class="label">Costos Fijos (mensual)</div><div class="value">${{ "%.2f"|format(total_fijos) }}</div></div> <div class="card metric"><div class="label">Costos Variables</div><div class="value">${{ "%.2f"|format(total_variables) }}</div></div> <div class="card metric"> <div class="label">Punto de Equilibrio</div> {% if punto_equilibrio_unidades %}
+        <div class="value">{{ punto_equilibrio_unidades|round(0) }} u.</div> <div class="delta">Con margen promedio de ${{ "%.2f"|format(margen_promedio) }} por unidad</div> {% else %}
+        <div class="value" style="font-size:1rem;">Cargá productos con margen positivo</div> {% endif %}
     </div>
-</div>
-
-<div class="card" style="margin-bottom:20px;">
-    <h3>➕ Agregar costo</h3>
-    <form method="POST">
-        <input type="hidden" name="accion" value="add">
-        <div class="grid grid-3">
-            <div><label>Nombre</label><input type="text" name="nombre" placeholder="Ej: Alquiler, Materia prima" required></div>
-            <div><label>Monto</label><input type="number" step="0.01" name="monto" required></div>
-            <div>
-                <label>Tipo</label>
-                <select name="tipo">
-                    <option value="fijo">Fijo</option>
-                    <option value="variable">Variable</option>
-                </select>
-            </div>
-        </div>
-        <label>Periodicidad</label>
-        <select name="periodicidad">
-            <option>Mensual</option>
-            <option>Anual</option>
-            <option>Por unidad</option>
-        </select>
-        <button type="submit" class="btn">Agregar</button>
-    </form>
-</div>
-
-<div class="grid grid-2">
-    <div class="card">
-        <h3>Costos Fijos</h3>
-        <table>
-            <thead><tr><th>Nombre</th><th>Monto</th><th>Periodicidad</th><th></th></tr></thead>
-            <tbody>
-            {% for c in costos_fijos %}
-                <tr>
-                    <td>{{ c.nombre }}</td><td>${{ "%.2f"|format(c.monto) }}</td><td>{{ c.periodicidad }}</td>
-                    <td><form method="POST"><input type="hidden" name="accion" value="del"><input type="hidden" name="id" value="{{ c.id }}"><button class="btn sm danger">✕</button></form></td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    <div class="card">
-        <h3>Costos Variables</h3>
-        <table>
-            <thead><tr><th>Nombre</th><th>Monto</th><th>Periodicidad</th><th></th></tr></thead>
-            <tbody>
-            {% for c in costos_variables %}
-                <tr>
-                    <td>{{ c.nombre }}</td><td>${{ "%.2f"|format(c.monto) }}</td><td>{{ c.periodicidad }}</td>
-                    <td><form method="POST"><input type="hidden" name="accion" value="del"><input type="hidden" name="id" value="{{ c.id }}"><button class="btn sm danger">✕</button></form></td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-{% endblock %}
+</div> <div class="card" style="margin-bottom:20px;"> <h3>Agregar costo</h3> <form method="POST"> <input type="hidden" name="accion" value="add"> <div class="grid grid-3"> <div><label>Nombre</label><input type="text" name="nombre" placeholder="Ej: Alquiler, Materia prima" required></div> <div><label>Monto</label><input type="number" step="0.01" name="monto" required></div> <div> <label>Tipo</label> <select name="tipo"> <option value="fijo">Fijo</option> <option value="variable">Variable</option> </select> </div> </div> <label>Periodicidad</label> <select name="periodicidad"> <option>Mensual</option> <option>Anual</option> <option>Por unidad</option> </select> <button type="submit" class="btn">Agregar</button> </form>
+</div> <div class="grid grid-2"> <div class="card"> <h3>Costos Fijos</h3> <table> <thead><tr><th>Nombre</th><th>Monto</th><th>Periodicidad</th><th></th></tr></thead> <tbody> {% for c in costos_fijos %}
+                <tr> <td>{{ c.nombre }}</td><td>${{ "%.2f"|format(c.monto) }}</td><td>{{ c.periodicidad }}</td> <td><form method="POST"><input type="hidden" name="accion" value="del"><input type="hidden" name="id" value="{{ c.id }}"><button class="btn sm danger"></button></form></td> </tr> {% endfor %}
+            </tbody> </table> </div> <div class="card"> <h3>Costos Variables</h3> <table> <thead><tr><th>Nombre</th><th>Monto</th><th>Periodicidad</th><th></th></tr></thead> <tbody> {% for c in costos_variables %}
+                <tr> <td>{{ c.nombre }}</td><td>${{ "%.2f"|format(c.monto) }}</td><td>{{ c.periodicidad }}</td> <td><form method="POST"><input type="hidden" name="accion" value="del"><input type="hidden" name="id" value="{{ c.id }}"><button class="btn sm danger"></button></form></td> </tr> {% endfor %}
+            </tbody> </table> </div>
+</div> {% endblock %}

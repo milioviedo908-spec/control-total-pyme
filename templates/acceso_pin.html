@@ -7,22 +7,11 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-<div class="access-screen">
-    <div class="access-box">
-        <h1>🧾 Modo Mostrador</h1>
-        <p>Ingresá el PIN de acceso rápido</p>
-        {% with messages = get_flashed_messages(with_categories=true) %}
+<div class="access-screen"> <div class="access-box"> <h1>Modo Mostrador</h1> <p>Ingresá el PIN de acceso rápido</p> {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
+                <div class="flash {{ category }}">{{ message }}</div> {% endfor %}
         {% endwith %}
-        <form method="POST">
-            <input type="password" name="pin" class="pin-input" maxlength="6" placeholder="••••" autofocus required>
-            <button type="submit" class="btn" style="width:100%">Ingresar</button>
-        </form>
-        <p style="margin-top:20px;"><a href="{{ url_for('acceso') }}" style="color:var(--celeste); font-weight:600;">&larr; Volver</a></p>
-        <p style="font-size:0.75rem; color:var(--texto-suave);">PIN de prueba: 1234</p>
-    </div>
+        <form method="POST"> <input type="password" name="pin" class="pin-input" maxlength="6" placeholder="••••" autofocus required> <button type="submit" class="btn" style="width:100%">Ingresar</button> </form> <p style="margin-top:20px;"><a href="{{ url_for('acceso') }}" style="color:var(--celeste); font-weight:600;">&larr; Volver</a></p> <p style="font-size:0.75rem; color:var(--texto-suave);">PIN de prueba: 1234</p> </div>
 </div>
 </body>
 </html>
