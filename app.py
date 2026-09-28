@@ -86,6 +86,7 @@ def init_db(force=False):
         "patrimonio_neto NUMERIC(12,2)",
         "total_costos_fijos NUMERIC(12,2)",
         "total_costos_variables NUMERIC(12,2)",
+        "valor_stock NUMERIC(12,2)",
     ]
     for columna in columnas_nuevas:
         nombre_col = columna.split()[0]
@@ -569,23 +570,30 @@ def cierre_mensual():
         total_costos_fijos = sum(float(c["monto"]) for c in costos if c["tipo"] == "fijo")
         total_costos_variables = sum(float(c["monto"]) for c in costos if c["tipo"] == "variable")
 
+        productos = conn_execute(conn, "SELECT * FROM productos").fetchall()
+        valor_stock = sum(float(p["costo"]) * p["stock"] for p in productos)
+
         # 1) Guardar la foto completa del mes que se cierra.
         conn_execute(
             conn,
             "INSERT INTO cierres_mensuales "
             "(periodo, ingresos_totales, egresos_totales, ganancia_neta, "
-            "total_activos, total_pasivos, patrimonio_neto, total_costos_fijos, total_costos_variables, fecha_cierre) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            "total_activos, total_pasivos, patrimonio_neto, total_costos_fijos, total_costos_variables, "
+            "valor_stock, fecha_cierre) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 periodo, ingresos, egresos, ganancia,
                 total_activos, total_pasivos, patrimonio_neto,
-                total_costos_fijos, total_costos_variables,
+                total_costos_fijos, total_costos_variables, valor_stock,
                 ahora().strftime("%Y-%m-%d %H:%M:%S"),
             ),
         )
 
         # 2) Reiniciar todo para arrancar el mes siguiente en cero.
-        #    El stock de productos y los socios (CapTable) NO se tocan.
+        #    El stock de productos (cantidades) y los socios (CapTable) NO se tocan,
+        #    pero el costo de cada producto se pone en $0 para que la valorización arranque en cero
+        #    hasta que se vuelva a cargar el costo.
+        conn_execute(conn, "UPDATE productos SET costo = 0")
         conn_execute(conn, "DELETE FROM venta_items")
         conn_execute(conn, "DELETE FROM ventas")
         conn_execute(conn, "DELETE FROM movimientos_caja")
