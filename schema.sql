@@ -103,5 +103,10 @@ CREATE TABLE cierres_mensuales (
     ingresos_totales NUMERIC(12,2),
     egresos_totales NUMERIC(12,2),
     ganancia_neta NUMERIC(12,2),
+    total_activos NUMERIC(12,2),
+    total_pasivos NUMERIC(12,2),
+    patrimonio_neto NUMERIC(12,2),
+    total_costos_fijos NUMERIC(12,2),
+    total_costos_variables NUMERIC(12,2),
     fecha_cierre TEXT
 );
