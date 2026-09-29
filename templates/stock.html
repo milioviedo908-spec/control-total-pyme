@@ -3,11 +3,111 @@
 {% block header %}Control de Stock e Inventario{% endblock %}
 {% block content %}
 
-<div class="grid grid-2" style="margin-bottom:20px;"> <div class="card metric"> <div class="label">Valorización total del stock</div> <div class="value">${{ "%.2f"|format(valor_stock) }}</div> </div> <div class="card"> <h3>Agregar producto</h3> <form method="POST"> <input type="hidden" name="accion" value="add"> <label>Nombre</label> <input type="text" name="nombre" required> <div class="grid grid-2" style="gap:10px;"> <div><label>Precio venta</label><input type="number" step="0.01" name="precio" required></div> <div><label>Costo</label><input type="number" step="0.01" name="costo" required></div> </div> <div class="grid grid-2" style="gap:10px;"> <div><label>Stock inicial</label><input type="number" name="stock" required></div> <div><label>Stock mínimo</label><input type="number" name="stock_minimo" required></div> </div> <button type="submit" class="btn">Agregar</button> </form> </div>
-</div> <div class="card"> <h3>Inventario actual</h3> <table> <thead><tr><th>Producto</th><th>Precio</th><th>Costo</th><th>Margen</th><th>Stock</th><th>Mínimo</th><th>Estado</th><th></th></tr></thead> <tbody> {% for p in productos %}
-            <tr> <td>{{ p.nombre }}</td> <td>${{ "%.2f"|format(p.precio) }}</td> <td>${{ "%.2f"|format(p.costo) }}</td> <td>${{ "%.2f"|format(p.precio - p.costo) }}</td> <td> <form method="POST" style="display:flex; gap:6px; align-items:center;"> <input type="hidden" name="accion" value="ajustar"> <input type="hidden" name="id" value="{{ p.id }}"> <input type="number" name="nuevo_stock" value="{{ p.stock }}" style="width:70px; padding:5px;"> <button type="submit" class="btn sm secondary"></button> </form> </td> <td>{{ p.stock_minimo }}</td> <td> {% if p.stock <= p.stock_minimo %}
-                        <span class="badge danger">Stock bajo</span> {% else %}
-                        <span class="badge ok">OK</span> {% endif %}
-                </td> <td> <form method="POST" onsubmit="return confirm('¿Eliminar producto?');"> <input type="hidden" name="accion" value="del"> <input type="hidden" name="id" value="{{ p.id }}"> <button type="submit" class="btn sm danger">Eliminar</button> </form> </td> </tr> {% endfor %}
-        </tbody> </table>
-</div> {% endblock %}
+<div class="grid grid-3" style="margin-bottom:14px;">
+    <div class="card metric">
+        <div class="label">Valorización total del stock</div>
+        <div class="value">${{ "%.2f"|format(valor_stock) }}</div>
+        <div class="delta">Costo de producción/compra × cantidad en stock</div>
+    </div>
+    <div class="card metric">
+        <div class="label">Ganancia potencial del stock</div>
+        <div class="value" style="color:var(--verde);">${{ "%.2f"|format(ganancia_potencial) }}</div>
+        <div class="delta">Si vendieras todo el stock actual a precio de lista</div>
+    </div>
+    <div class="card">
+        <h3>¿Qué es el "costo"?</h3>
+        <p style="font-size:0.84rem; color:var(--texto-suave); margin:0;">
+            Es la inversión que te significa tener una unidad de ese producto o servicio: lo que pagaste
+            por la materia prima, la mercadería, o lo que te insume prestarlo. Se carga por separado del
+            precio de venta, y es lo que se usa para calcular tu margen real y el punto de equilibrio.
+            Al hacer el cierre mensual, el costo de cada producto vuelve a $0 para que vuelvas a cargar
+            la inversión del nuevo período.
+        </p>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <h3>Agregar producto o servicio</h3>
+    <form method="POST">
+        <input type="hidden" name="accion" value="add">
+        <label>Nombre</label>
+        <input type="text" name="nombre" placeholder="Ej: Corte de pelo, Remera talle M" required>
+        <div class="grid grid-2" style="gap:10px;">
+            <div><label>Precio de venta</label><input type="number" step="0.01" name="precio" required></div>
+            <div><label>Costo (tu inversión por unidad)</label><input type="number" step="0.01" name="costo" required></div>
+        </div>
+        <div class="grid grid-2" style="gap:10px;">
+            <div><label>Cantidad inicial</label><input type="number" name="stock" required></div>
+            <div><label>Alerta de stock mínimo</label><input type="number" name="stock_minimo" required></div>
+        </div>
+        <button type="submit" class="btn">Agregar</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Inventario actual</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Precio</th>
+                <th>Costo</th>
+                <th>Margen / Ganancia</th>
+                <th>Cantidad</th>
+                <th>Mínimo</th>
+                <th>Estado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for p in productos %}
+            {% set margen_pct = ((p.precio - p.costo) / p.precio * 100) if p.precio > 0 else 0 %}
+            <tr>
+                <td>{{ p.nombre }}</td>
+                <td>${{ "%.2f"|format(p.precio) }}</td>
+                <td>${{ "%.2f"|format(p.costo) }}</td>
+                <td>${{ "%.2f"|format(p.precio - p.costo) }} ({{ "%.1f"|format(margen_pct) }}%)</td>
+                <td>{{ p.stock }}</td>
+                <td>{{ p.stock_minimo }}</td>
+                <td>
+                    {% if p.stock <= p.stock_minimo %}
+                        <span class="badge danger">Stock bajo</span>
+                    {% else %}
+                        <span class="badge ok">OK</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" onsubmit="return confirm('¿Eliminar producto?');">
+                        <input type="hidden" name="accion" value="del">
+                        <input type="hidden" name="id" value="{{ p.id }}">
+                        <button type="submit" class="btn sm danger">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="8" style="padding-top:0; padding-bottom:14px;">
+                    <form method="POST" style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+                        <input type="hidden" name="accion" value="ajustar">
+                        <input type="hidden" name="id" value="{{ p.id }}">
+                        <div>
+                            <label style="margin-top:0;">Cantidad</label>
+                            <input type="number" name="nuevo_stock" value="{{ p.stock }}" style="width:90px;">
+                        </div>
+                        <div>
+                            <label style="margin-top:0;">Precio</label>
+                            <input type="number" step="0.01" name="nuevo_precio" value="{{ p.precio }}" style="width:110px;">
+                        </div>
+                        <div>
+                            <label style="margin-top:0;">Costo</label>
+                            <input type="number" step="0.01" name="nuevo_costo" value="{{ p.costo }}" style="width:110px;">
+                        </div>
+                        <button type="submit" class="btn sm secondary">Guardar cambios</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
