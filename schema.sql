@@ -49,7 +49,8 @@ CREATE TABLE venta_items (
     producto_id INTEGER NOT NULL REFERENCES productos(id),
     producto_nombre TEXT,
     cantidad INTEGER NOT NULL,
-    precio_unitario NUMERIC(12,2) NOT NULL
+    precio_unitario NUMERIC(12,2) NOT NULL,
+    costo_unitario NUMERIC(12,2)
 );
 
 CREATE TABLE movimientos_caja (
@@ -108,5 +109,6 @@ CREATE TABLE cierres_mensuales (
     patrimonio_neto NUMERIC(12,2),
     total_costos_fijos NUMERIC(12,2),
     total_costos_variables NUMERIC(12,2),
+    valor_stock NUMERIC(12,2),
     fecha_cierre TEXT
 );
