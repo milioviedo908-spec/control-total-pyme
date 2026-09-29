@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from functools import wraps
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -21,17 +22,39 @@ app.secret_key = os.environ.get("SECRET_KEY", "cambia-esta-clave-en-produccion")
 
 
 # ---------- Base de datos (PostgreSQL / Neon) ----------
-def get_db():
-    if not DATABASE_URL:
-        raise RuntimeError(
-            "Falta la variable de entorno DATABASE_URL con la cadena de conexión de Neon."
+# Pool de conexiones: en vez de abrir una conexión nueva (con su handshake SSL contra
+# Neon) en cada página, se reutilizan conexiones ya abiertas. Esto es lo que hace que
+# cambiar de sección se sienta mucho más rápido.
+_pool = None
+
+
+def get_pool():
+    global _pool
+    if _pool is None:
+        if not DATABASE_URL:
+            raise RuntimeError(
+                "Falta la variable de entorno DATABASE_URL con la cadena de conexión de Neon."
+            )
+        _pool = psycopg2.pool.ThreadedConnectionPool(
+            1, 10,
+            DATABASE_URL,
+            sslmode="require",
+            cursor_factory=psycopg2.extras.RealDictCursor,
         )
-    conn = psycopg2.connect(
-        DATABASE_URL,
-        sslmode="require",
-        cursor_factory=psycopg2.extras.RealDictCursor,
-    )
-    return conn
+    return _pool
+
+
+def get_db():
+    return get_pool().getconn()
+
+
+def release_db(conn):
+    """Devuelve la conexión al pool en vez de cerrarla de verdad."""
+    if conn is not None:
+        try:
+            get_pool().putconn(conn)
+        except Exception:
+            pass
 
 
 def conn_execute(conn, sql, params=()):
@@ -73,10 +96,7 @@ def init_db(force=False):
                 ("Sueldos", 400000, "Mensual", "fijo"),
             ],
         )
-        cur.executemany(
-            "INSERT INTO socios (nombre, porcentaje) VALUES (%s, %s)",
-            [("Socio 1", 60), ("Socio 2", 40)],
-        )
+        # Los socios arrancan vacíos: se cargan desde la sección "Socios" cuando corresponda.
         conn.commit()
 
     # Migración: agrega columnas nuevas a bases ya existentes sin perder datos.
@@ -91,10 +111,11 @@ def init_db(force=False):
     for columna in columnas_nuevas:
         nombre_col = columna.split()[0]
         cur.execute(f"ALTER TABLE cierres_mensuales ADD COLUMN IF NOT EXISTS {columna}")
+    cur.execute("ALTER TABLE venta_items ADD COLUMN IF NOT EXISTS costo_unitario NUMERIC(12,2)")
     conn.commit()
 
     cur.close()
-    conn.close()
+    release_db(conn)
 
 
 def registrar_historial(usuario, accion, detalle="", monto=None):
@@ -105,13 +126,13 @@ def registrar_historial(usuario, accion, detalle="", monto=None):
         (ahora().strftime("%Y-%m-%d %H:%M:%S"), usuario, accion, detalle, monto),
     )
     conn.commit()
-    conn.close()
+    release_db(conn)
 
 
 def get_config(clave, default=None):
     conn = get_db()
     row = conn_execute(conn, "SELECT valor FROM config WHERE clave = %s", (clave,)).fetchone()
-    conn.close()
+    release_db(conn)
     return row["valor"] if row else default
 
 
@@ -124,7 +145,7 @@ def set_config(clave, valor):
         (clave, valor),
     )
     conn.commit()
-    conn.close()
+    release_db(conn)
 
 
 # ---------- Autenticación / control de acceso ----------
@@ -184,7 +205,7 @@ def acceso_admin():
         password = request.form.get("password", "")
         conn = get_db()
         user = conn_execute(conn, "SELECT * FROM usuarios WHERE email = %s", (email,)).fetchone()
-        conn.close()
+        release_db(conn)
         if user and check_password_hash(user["password_hash"], password):
             session.clear()
             session["rol"] = "privado"
@@ -226,9 +247,9 @@ def mostrador():
             ).fetchone()["id"]
             conn_execute(
                 conn,
-                "INSERT INTO venta_items (venta_id, producto_id, producto_nombre, cantidad, precio_unitario) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (venta_id, producto_id, producto["nombre"], cantidad, producto["precio"]),
+                "INSERT INTO venta_items (venta_id, producto_id, producto_nombre, cantidad, precio_unitario, costo_unitario) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (venta_id, producto_id, producto["nombre"], cantidad, producto["precio"], producto["costo"]),
             )
             conn_execute(conn, "UPDATE productos SET stock = stock - %s WHERE id = %s", (cantidad, producto_id))
             conn_execute(
@@ -238,13 +259,13 @@ def mostrador():
                 (fecha, total, f"Venta ticket #{venta_id} - {producto['nombre']} x{cantidad}"),
             )
             conn.commit()
-            conn.close()
+            release_db(conn)
             registrar_historial(session.get("usuario_nombre"), "Venta registrada", f"{producto['nombre']} x{cantidad}", total)
             flash(f"Venta registrada. Ticket #{venta_id} - Total: ${total:,.2f}", "success")
             return redirect(url_for("ticket", venta_id=venta_id))
 
     productos = conn_execute(conn, "SELECT * FROM productos ORDER BY nombre").fetchall()
-    conn.close()
+    release_db(conn)
     return render_template("mostrador.html", productos=productos)
 
 
@@ -254,7 +275,7 @@ def ticket(venta_id):
     conn = get_db()
     venta = conn_execute(conn, "SELECT * FROM ventas WHERE id = %s", (venta_id,)).fetchone()
     items = conn_execute(conn, "SELECT * FROM venta_items WHERE venta_id = %s", (venta_id,)).fetchall()
-    conn.close()
+    release_db(conn)
     if not venta:
         flash("Ticket no encontrado.", "error")
         return redirect(url_for("mostrador"))
@@ -308,7 +329,21 @@ def dashboard():
         conn, "SELECT * FROM productos WHERE stock <= stock_minimo ORDER BY stock ASC"
     ).fetchall()
 
-    conn.close()
+    # Ganancia real de lo vendido: (precio - costo al momento de la venta) x cantidad.
+    # Solo cuenta ventas hechas después de agregar esta función (tienen costo_unitario guardado).
+    ganancia_vendido = conn_execute(
+        conn,
+        "SELECT COALESCE(SUM((precio_unitario - costo_unitario) * cantidad), 0) AS s "
+        "FROM venta_items WHERE costo_unitario IS NOT NULL",
+    ).fetchone()["s"]
+    facturacion_bruta = conn_execute(
+        conn, "SELECT COALESCE(SUM(precio_unitario * cantidad), 0) AS s FROM venta_items WHERE costo_unitario IS NOT NULL"
+    ).fetchone()["s"]
+    hay_ventas_sin_costo = conn_execute(
+        conn, "SELECT COUNT(*) AS c FROM venta_items WHERE costo_unitario IS NULL"
+    ).fetchone()["c"] > 0
+
+    release_db(conn)
 
     variacion = 0
     prev_t = float(ventas_semana_prev["t"])
@@ -322,6 +357,9 @@ def dashboard():
         producto_top=producto_top["producto_nombre"] if producto_top else "Sin datos",
         ticket_promedio=ticket_promedio,
         caja_disponible=caja_disponible,
+        ganancia_vendido=float(ganancia_vendido),
+        facturacion_bruta=float(facturacion_bruta),
+        hay_ventas_sin_costo=hay_ventas_sin_costo,
         dias=dias,
         valores=valores,
         stock_bajo=stock_bajo,
@@ -354,7 +392,7 @@ def finanzas():
         elif accion == "del_pasivo":
             conn_execute(conn, "DELETE FROM pasivos WHERE id = %s", (int(request.form["id"]),))
         conn.commit()
-        conn.close()
+        release_db(conn)
         return redirect(url_for("finanzas"))
 
     activos = conn_execute(conn, "SELECT * FROM activos ORDER BY id DESC").fetchall()
@@ -362,7 +400,7 @@ def finanzas():
     total_activos = sum(float(a["monto"]) for a in activos)
     total_pasivos = sum(float(p["monto"]) for p in pasivos)
     patrimonio_neto = total_activos - total_pasivos
-    conn.close()
+    release_db(conn)
     return render_template(
         "finanzas.html",
         activos=activos,
@@ -390,7 +428,7 @@ def flujo_caja():
             (fecha, tipo, categoria, monto, descripcion),
         )
         conn.commit()
-        conn.close()
+        release_db(conn)
         registrar_historial(session.get("usuario_nombre"), f"{tipo.capitalize()} de caja", f"{categoria}: {descripcion}", monto)
         return redirect(url_for("flujo_caja"))
 
@@ -399,7 +437,7 @@ def flujo_caja():
     ).fetchall()
     ingresos = float(conn_execute(conn, "SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_caja WHERE tipo='ingreso'").fetchone()["s"])
     egresos = float(conn_execute(conn, "SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_caja WHERE tipo='egreso'").fetchone()["s"])
-    conn.close()
+    release_db(conn)
     return render_template(
         "flujo_caja.html", movimientos=movimientos, ingresos=ingresos, egresos=egresos, saldo=ingresos - egresos
     )
@@ -421,7 +459,7 @@ def costos():
         elif accion == "del":
             conn_execute(conn, "DELETE FROM costos_fijos WHERE id = %s", (int(request.form["id"]),))
         conn.commit()
-        conn.close()
+        release_db(conn)
         return redirect(url_for("costos"))
 
     costos_fijos = conn_execute(conn, "SELECT * FROM costos_fijos WHERE tipo='fijo' ORDER BY id DESC").fetchall()
@@ -435,7 +473,7 @@ def costos():
         margenes = [(float(p["precio"]) - float(p["costo"])) for p in productos if p["precio"] > 0]
         margen_promedio = sum(margenes) / len(margenes) if margenes else 0
     punto_equilibrio_unidades = (total_fijos / margen_promedio) if margen_promedio > 0 else None
-    conn.close()
+    release_db(conn)
     return render_template(
         "costos.html",
         costos_fijos=costos_fijos,
@@ -470,10 +508,15 @@ def stock():
         elif accion == "ajustar":
             conn_execute(
                 conn,
-                "UPDATE productos SET stock = %s WHERE id = %s",
-                (int(request.form["nuevo_stock"]), int(request.form["id"])),
+                "UPDATE productos SET stock = %s, precio = %s, costo = %s WHERE id = %s",
+                (
+                    int(request.form["nuevo_stock"]),
+                    float(request.form["nuevo_precio"]),
+                    float(request.form["nuevo_costo"]),
+                    int(request.form["id"]),
+                ),
             )
-            registrar_historial(session.get("usuario_nombre"), "Ajuste de stock", f"Producto ID {request.form['id']}")
+            registrar_historial(session.get("usuario_nombre"), "Producto actualizado", f"Producto ID {request.form['id']}")
         elif accion == "del":
             try:
                 conn_execute(conn, "DELETE FROM productos WHERE id = %s", (int(request.form["id"]),))
@@ -485,16 +528,19 @@ def stock():
                     "Si no lo vendés más, poné su stock en 0 en lugar de borrarlo.",
                     "error",
                 )
-            conn.close()
+            release_db(conn)
             return redirect(url_for("stock"))
         conn.commit()
-        conn.close()
+        release_db(conn)
         return redirect(url_for("stock"))
 
     productos = conn_execute(conn, "SELECT * FROM productos ORDER BY nombre").fetchall()
     valor_stock = sum(float(p["costo"]) * p["stock"] for p in productos)
-    conn.close()
-    return render_template("stock.html", productos=productos, valor_stock=valor_stock)
+    ganancia_potencial = sum((float(p["precio"]) - float(p["costo"])) * p["stock"] for p in productos)
+    release_db(conn)
+    return render_template(
+        "stock.html", productos=productos, valor_stock=valor_stock, ganancia_potencial=ganancia_potencial
+    )
 
 
 # ---------- Socios / CapTable ----------
@@ -505,15 +551,27 @@ def socios():
     if request.method == "POST":
         accion = request.form.get("accion")
         if accion == "add":
-            conn_execute(
-                conn,
-                "INSERT INTO socios (nombre, porcentaje) VALUES (%s, %s)",
-                (request.form["nombre"], float(request.form["porcentaje"])),
+            nuevo_porcentaje = float(request.form["porcentaje"])
+            total_actual = float(
+                conn_execute(conn, "SELECT COALESCE(SUM(porcentaje),0) AS s FROM socios").fetchone()["s"]
             )
+            if total_actual + nuevo_porcentaje > 100:
+                disponible = 100 - total_actual
+                flash(
+                    f"No se puede agregar ese porcentaje: ya hay {total_actual:.2f}% asignado. "
+                    f"Como máximo podés cargar {disponible:.2f}% más.",
+                    "error",
+                )
+            else:
+                conn_execute(
+                    conn,
+                    "INSERT INTO socios (nombre, porcentaje) VALUES (%s, %s)",
+                    (request.form["nombre"], nuevo_porcentaje),
+                )
         elif accion == "del":
             conn_execute(conn, "DELETE FROM socios WHERE id = %s", (int(request.form["id"]),))
         conn.commit()
-        conn.close()
+        release_db(conn)
         return redirect(url_for("socios"))
 
     lista_socios = conn_execute(conn, "SELECT * FROM socios ORDER BY porcentaje DESC").fetchall()
@@ -522,7 +580,7 @@ def socios():
     ingresos = float(conn_execute(conn, "SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_caja WHERE tipo='ingreso'").fetchone()["s"])
     egresos = float(conn_execute(conn, "SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_caja WHERE tipo='egreso'").fetchone()["s"])
     ganancia_neta = ingresos - egresos
-    conn.close()
+    release_db(conn)
 
     distribucion = [
         {"nombre": s["nombre"], "porcentaje": float(s["porcentaje"]), "monto": ganancia_neta * (float(s["porcentaje"]) / 100)}
@@ -538,13 +596,62 @@ def socios():
     )
 
 
+# ---------- Facturación por producto ----------
+@app.route("/facturacion")
+@login_required(roles=["privado"])
+def facturacion():
+    conn = get_db()
+    filas = conn_execute(
+        conn,
+        "SELECT producto_nombre, "
+        "SUM(cantidad) AS unidades, "
+        "SUM(precio_unitario * cantidad) AS facturado, "
+        "SUM(CASE WHEN costo_unitario IS NOT NULL THEN costo_unitario * cantidad ELSE 0 END) AS costo, "
+        "SUM(CASE WHEN costo_unitario IS NULL THEN cantidad ELSE 0 END) AS unidades_sin_costo "
+        "FROM venta_items "
+        "GROUP BY producto_nombre "
+        "ORDER BY facturado DESC",
+    ).fetchall()
+
+    filas_calculadas = []
+    total_facturado = 0.0
+    total_costo = 0.0
+    hay_faltantes = False
+    for f in filas:
+        facturado = float(f["facturado"])
+        costo = float(f["costo"])
+        ganancia = facturado - costo
+        total_facturado += facturado
+        total_costo += costo
+        if f["unidades_sin_costo"] > 0:
+            hay_faltantes = True
+        filas_calculadas.append({
+            "producto_nombre": f["producto_nombre"],
+            "unidades": f["unidades"],
+            "facturado": facturado,
+            "costo": costo,
+            "ganancia": ganancia,
+            "unidades_sin_costo": f["unidades_sin_costo"],
+        })
+
+    release_db(conn)
+    return render_template(
+        "facturacion.html",
+        filas=filas_calculadas,
+        total_facturado=total_facturado,
+        total_costo=total_costo,
+        total_ganancia=total_facturado - total_costo,
+        hay_faltantes=hay_faltantes,
+    )
+
+
 # ---------- Historial / Auditoría ----------
 @app.route("/historial")
 @login_required(roles=["privado"])
 def historial():
     conn = get_db()
     registros = conn_execute(conn, "SELECT * FROM historial ORDER BY id DESC LIMIT 200").fetchall()
-    conn.close()
+    release_db(conn)
     return render_template("historial.html", registros=registros)
 
 
@@ -602,7 +709,7 @@ def cierre_mensual():
         conn_execute(conn, "DELETE FROM costos_fijos")
 
         conn.commit()
-        conn.close()
+        release_db(conn)
         registrar_historial(
             session.get("usuario_nombre"),
             "Cierre mensual generado (reinicio de ventas, caja, finanzas y costos)",
@@ -616,7 +723,7 @@ def cierre_mensual():
         return redirect(url_for("cierre_mensual"))
 
     cierres = conn_execute(conn, "SELECT * FROM cierres_mensuales ORDER BY id DESC").fetchall()
-    conn.close()
+    release_db(conn)
     return render_template("cierre_mensual.html", cierres=cierres)
 
 
