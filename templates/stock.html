@@ -28,18 +28,35 @@
 
 <div class="card" style="margin-bottom:20px;">
     <h3>Agregar producto o servicio</h3>
-    <form method="POST">
+    <form method="POST" id="form-agregar">
         <input type="hidden" name="accion" value="add">
+        <label>Tipo</label>
+        <select name="tipo" id="selector-tipo" onchange="mostrarCampos()">
+            <option value="producto">Producto</option>
+            <option value="servicio">Servicio</option>
+        </select>
+
         <label>Nombre</label>
-        <input type="text" name="nombre" placeholder="Ej: Corte de pelo, Remera talle M" required>
+        <input type="text" name="nombre" placeholder="Ej: Remera talle M / Mantenimiento mensual web" required>
+
         <div class="grid grid-2" style="gap:10px;">
             <div><label>Precio de venta</label><input type="number" step="0.01" name="precio" required></div>
-            <div><label>Costo (tu inversión por unidad)</label><input type="number" step="0.01" name="costo" required></div>
+            <div><label>Costo (tu inversión)</label><input type="number" step="0.01" name="costo" required></div>
         </div>
-        <div class="grid grid-2" style="gap:10px;">
-            <div><label>Cantidad inicial</label><input type="number" name="stock" required></div>
-            <div><label>Alerta de stock mínimo</label><input type="number" name="stock_minimo" required></div>
+
+        <div id="campos-producto" class="grid grid-2" style="gap:10px;">
+            <div><label>Cantidad inicial</label><input type="number" name="stock" value="0"></div>
+            <div><label>Alerta de stock mínimo</label><input type="number" name="stock_minimo" value="0"></div>
         </div>
+
+        <div id="campos-servicio" style="display:none;">
+            <label>Plan</label>
+            <select name="plan">
+                <option value="Mensual">Mensual</option>
+                <option value="Anual">Anual</option>
+            </select>
+        </div>
+
         <button type="submit" class="btn">Agregar</button>
     </form>
 </div>
@@ -49,11 +66,12 @@
     <table>
         <thead>
             <tr>
-                <th>Producto</th>
+                <th>Producto / Servicio</th>
+                <th>Tipo</th>
                 <th>Precio</th>
                 <th>Costo</th>
                 <th>Margen / Ganancia</th>
-                <th>Cantidad</th>
+                <th>Cantidad / Plan</th>
                 <th>Mínimo</th>
                 <th>Estado</th>
                 <th></th>
@@ -64,9 +82,15 @@
             {% set margen_pct = ((p.precio - p.costo) / p.precio * 100) if p.precio > 0 else 0 %}
             <tr>
                 <td>{{ p.nombre }}</td>
+                <td>{{ 'Servicio' if p.tipo == 'servicio' else 'Producto' }}</td>
                 <td>${{ "%.2f"|format(p.precio) }}</td>
                 <td>${{ "%.2f"|format(p.costo) }}</td>
                 <td>${{ "%.2f"|format(p.precio - p.costo) }} ({{ "%.1f"|format(margen_pct) }}%)</td>
+                {% if p.tipo == 'servicio' %}
+                <td>{{ p.plan or '—' }}</td>
+                <td>—</td>
+                <td><span class="badge" style="background:var(--acento-suave); color:var(--acento); border-color:var(--acento);">Servicio</span></td>
+                {% else %}
                 <td>{{ p.stock }}</td>
                 <td>{{ p.stock_minimo }}</td>
                 <td>
@@ -76,8 +100,9 @@
                         <span class="badge ok">OK</span>
                     {% endif %}
                 </td>
+                {% endif %}
                 <td>
-                    <form method="POST" onsubmit="return confirm('¿Eliminar producto?');">
+                    <form method="POST" onsubmit="return confirm('¿Eliminar?');">
                         <input type="hidden" name="accion" value="del">
                         <input type="hidden" name="id" value="{{ p.id }}">
                         <button type="submit" class="btn sm danger">Eliminar</button>
@@ -85,14 +110,17 @@
                 </td>
             </tr>
             <tr>
-                <td colspan="8" style="padding-top:0; padding-bottom:14px;">
+                <td colspan="9" style="padding-top:0; padding-bottom:14px;">
                     <form method="POST" style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
                         <input type="hidden" name="accion" value="ajustar">
                         <input type="hidden" name="id" value="{{ p.id }}">
+                        <input type="hidden" name="tipo_producto" value="{{ p.tipo }}">
+                        {% if p.tipo != 'servicio' %}
                         <div>
                             <label style="margin-top:0;">Cantidad</label>
                             <input type="number" name="nuevo_stock" value="{{ p.stock }}" style="width:90px;">
                         </div>
+                        {% endif %}
                         <div>
                             <label style="margin-top:0;">Precio</label>
                             <input type="number" step="0.01" name="nuevo_precio" value="{{ p.precio }}" style="width:110px;">
@@ -101,6 +129,15 @@
                             <label style="margin-top:0;">Costo</label>
                             <input type="number" step="0.01" name="nuevo_costo" value="{{ p.costo }}" style="width:110px;">
                         </div>
+                        {% if p.tipo == 'servicio' %}
+                        <div>
+                            <label style="margin-top:0;">Plan</label>
+                            <select name="nuevo_plan" style="width:110px;">
+                                <option value="Mensual" {{ 'selected' if p.plan == 'Mensual' }}>Mensual</option>
+                                <option value="Anual" {{ 'selected' if p.plan == 'Anual' }}>Anual</option>
+                            </select>
+                        </div>
+                        {% endif %}
                         <button type="submit" class="btn sm secondary">Guardar cambios</button>
                     </form>
                 </td>
@@ -110,4 +147,13 @@
     </table>
 </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+function mostrarCampos() {
+    const tipo = document.getElementById('selector-tipo').value;
+    document.getElementById('campos-producto').style.display = (tipo === 'producto') ? 'grid' : 'none';
+    document.getElementById('campos-servicio').style.display = (tipo === 'servicio') ? 'block' : 'none';
+}
+</script>
 {% endblock %}
