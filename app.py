@@ -112,6 +112,22 @@ def init_db(force=False):
         nombre_col = columna.split()[0]
         cur.execute(f"ALTER TABLE cierres_mensuales ADD COLUMN IF NOT EXISTS {columna}")
     cur.execute("ALTER TABLE venta_items ADD COLUMN IF NOT EXISTS costo_unitario NUMERIC(12,2)")
+    cur.execute("ALTER TABLE productos ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'producto'")
+    cur.execute("ALTER TABLE productos ADD COLUMN IF NOT EXISTS plan TEXT")
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS clientes_servicios ("
+        "id SERIAL PRIMARY KEY, "
+        "servicio_id INTEGER REFERENCES productos(id), "
+        "servicio_nombre TEXT, "
+        "cliente_nombre TEXT NOT NULL, "
+        "cliente_celular TEXT, "
+        "plan TEXT, "
+        "monto NUMERIC(12,2) NOT NULL, "
+        "pagado BOOLEAN NOT NULL DEFAULT FALSE, "
+        "fecha_registro TEXT, "
+        "fecha_pago TEXT"
+        ")"
+    )
     conn.commit()
 
     cur.close()
@@ -264,7 +280,9 @@ def mostrador():
             flash(f"Venta registrada. Ticket #{venta_id} - Total: ${total:,.2f}", "success")
             return redirect(url_for("ticket", venta_id=venta_id))
 
-    productos = conn_execute(conn, "SELECT * FROM productos ORDER BY nombre").fetchall()
+    productos = conn_execute(
+        conn, "SELECT * FROM productos WHERE tipo = 'producto' ORDER BY nombre"
+    ).fetchall()
     release_db(conn)
     return render_template("mostrador.html", productos=productos)
 
@@ -493,30 +511,57 @@ def stock():
     if request.method == "POST":
         accion = request.form.get("accion")
         if accion == "add":
-            conn_execute(
-                conn,
-                "INSERT INTO productos (nombre, precio, costo, stock, stock_minimo) VALUES (%s, %s, %s, %s, %s)",
-                (
-                    request.form["nombre"],
-                    float(request.form["precio"]),
-                    float(request.form["costo"]),
-                    int(request.form["stock"]),
-                    int(request.form["stock_minimo"]),
-                ),
-            )
-            registrar_historial(session.get("usuario_nombre"), "Producto agregado", request.form["nombre"])
+            tipo = request.form.get("tipo", "producto")
+            if tipo == "servicio":
+                conn_execute(
+                    conn,
+                    "INSERT INTO productos (nombre, precio, costo, stock, stock_minimo, tipo, plan) "
+                    "VALUES (%s, %s, %s, 0, 0, 'servicio', %s)",
+                    (
+                        request.form["nombre"],
+                        float(request.form["precio"]),
+                        float(request.form["costo"]),
+                        request.form.get("plan", "Mensual"),
+                    ),
+                )
+            else:
+                conn_execute(
+                    conn,
+                    "INSERT INTO productos (nombre, precio, costo, stock, stock_minimo, tipo, plan) "
+                    "VALUES (%s, %s, %s, %s, %s, 'producto', NULL)",
+                    (
+                        request.form["nombre"],
+                        float(request.form["precio"]),
+                        float(request.form["costo"]),
+                        int(request.form["stock"]),
+                        int(request.form["stock_minimo"]),
+                    ),
+                )
+            registrar_historial(session.get("usuario_nombre"), "Producto/servicio agregado", request.form["nombre"])
         elif accion == "ajustar":
-            conn_execute(
-                conn,
-                "UPDATE productos SET stock = %s, precio = %s, costo = %s WHERE id = %s",
-                (
-                    int(request.form["nuevo_stock"]),
-                    float(request.form["nuevo_precio"]),
-                    float(request.form["nuevo_costo"]),
-                    int(request.form["id"]),
-                ),
-            )
-            registrar_historial(session.get("usuario_nombre"), "Producto actualizado", f"Producto ID {request.form['id']}")
+            if request.form.get("tipo_producto") == "servicio":
+                conn_execute(
+                    conn,
+                    "UPDATE productos SET precio = %s, costo = %s, plan = %s WHERE id = %s",
+                    (
+                        float(request.form["nuevo_precio"]),
+                        float(request.form["nuevo_costo"]),
+                        request.form.get("nuevo_plan", "Mensual"),
+                        int(request.form["id"]),
+                    ),
+                )
+            else:
+                conn_execute(
+                    conn,
+                    "UPDATE productos SET stock = %s, precio = %s, costo = %s WHERE id = %s",
+                    (
+                        int(request.form["nuevo_stock"]),
+                        float(request.form["nuevo_precio"]),
+                        float(request.form["nuevo_costo"]),
+                        int(request.form["id"]),
+                    ),
+                )
+            registrar_historial(session.get("usuario_nombre"), "Producto/servicio actualizado", f"ID {request.form['id']}")
         elif accion == "del":
             try:
                 conn_execute(conn, "DELETE FROM productos WHERE id = %s", (int(request.form["id"]),))
@@ -540,6 +585,96 @@ def stock():
     release_db(conn)
     return render_template(
         "stock.html", productos=productos, valor_stock=valor_stock, ganancia_potencial=ganancia_potencial
+    )
+
+
+# ---------- Clientes / Pagos (seguimiento de servicios) ----------
+@app.route("/clientes", methods=["GET", "POST"])
+@login_required(roles=["privado"])
+def clientes():
+    conn = get_db()
+    if request.method == "POST":
+        accion = request.form.get("accion")
+
+        if accion == "add":
+            servicio_id = int(request.form["servicio_id"])
+            servicio = conn_execute(conn, "SELECT * FROM productos WHERE id = %s", (servicio_id,)).fetchone()
+            ya_pago = request.form.get("ya_pago") == "on"
+            fecha_reg = ahora().strftime("%Y-%m-%d %H:%M:%S")
+            fecha_pago = fecha_reg if ya_pago else None
+            monto = float(request.form["monto"])
+            cliente_nombre = request.form["cliente_nombre"]
+            plan = request.form.get("plan", "Mensual")
+
+            registro_id = conn_execute(
+                conn,
+                "INSERT INTO clientes_servicios "
+                "(servicio_id, servicio_nombre, cliente_nombre, cliente_celular, plan, monto, pagado, fecha_registro, fecha_pago) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (
+                    servicio_id, servicio["nombre"] if servicio else "Servicio",
+                    cliente_nombre, request.form.get("cliente_celular", ""),
+                    plan, monto, ya_pago, fecha_reg, fecha_pago,
+                ),
+            ).fetchone()["id"]
+
+            if ya_pago:
+                conn_execute(
+                    conn,
+                    "INSERT INTO movimientos_caja (fecha, tipo, categoria, monto, descripcion) "
+                    "VALUES (%s, 'ingreso', 'Servicio', %s, %s)",
+                    (fecha_reg, monto, f"{servicio['nombre'] if servicio else 'Servicio'} - {cliente_nombre}"),
+                )
+                registrar_historial(session.get("usuario_nombre"), "Pago de servicio recibido", f"{cliente_nombre}", monto)
+            else:
+                registrar_historial(session.get("usuario_nombre"), "Servicio registrado (pendiente de pago)", f"{cliente_nombre}", monto)
+
+        elif accion == "marcar_pagado":
+            reg_id = int(request.form["id"])
+            reg = conn_execute(conn, "SELECT * FROM clientes_servicios WHERE id = %s", (reg_id,)).fetchone()
+            if reg and not reg["pagado"]:
+                fecha_pago = ahora().strftime("%Y-%m-%d %H:%M:%S")
+                conn_execute(
+                    conn, "UPDATE clientes_servicios SET pagado = TRUE, fecha_pago = %s WHERE id = %s",
+                    (fecha_pago, reg_id),
+                )
+                conn_execute(
+                    conn,
+                    "INSERT INTO movimientos_caja (fecha, tipo, categoria, monto, descripcion) "
+                    "VALUES (%s, 'ingreso', 'Servicio', %s, %s)",
+                    (fecha_pago, float(reg["monto"]), f"{reg['servicio_nombre']} - {reg['cliente_nombre']}"),
+                )
+                registrar_historial(session.get("usuario_nombre"), "Pago de servicio recibido", reg["cliente_nombre"], float(reg["monto"]))
+
+        elif accion == "del":
+            reg_id = int(request.form["id"])
+            reg = conn_execute(conn, "SELECT * FROM clientes_servicios WHERE id = %s", (reg_id,)).fetchone()
+            if reg and reg["pagado"]:
+                flash("No se puede borrar un registro ya pagado (quedaría descuadrada la caja).", "error")
+            else:
+                conn_execute(conn, "DELETE FROM clientes_servicios WHERE id = %s", (reg_id,))
+
+        conn.commit()
+        release_db(conn)
+        return redirect(url_for("clientes"))
+
+    servicios = conn_execute(conn, "SELECT * FROM productos WHERE tipo = 'servicio' ORDER BY nombre").fetchall()
+    pendientes = conn_execute(
+        conn, "SELECT * FROM clientes_servicios WHERE pagado = FALSE ORDER BY id DESC"
+    ).fetchall()
+    pagados = conn_execute(
+        conn, "SELECT * FROM clientes_servicios WHERE pagado = TRUE ORDER BY id DESC LIMIT 100"
+    ).fetchall()
+    total_pendiente = sum(float(p["monto"]) for p in pendientes)
+    total_cobrado = sum(float(p["monto"]) for p in pagados)
+    release_db(conn)
+    return render_template(
+        "clientes.html",
+        servicios=servicios,
+        pendientes=pendientes,
+        pagados=pagados,
+        total_pendiente=total_pendiente,
+        total_cobrado=total_cobrado,
     )
 
 
@@ -697,9 +832,8 @@ def cierre_mensual():
         )
 
         # 2) Reiniciar todo para arrancar el mes siguiente en cero.
-        #    El stock de productos (cantidades) y los socios (CapTable) NO se tocan,
-        #    pero el costo de cada producto se pone en $0 para que la valorización arranque en cero
-        #    hasta que se vuelva a cargar el costo.
+        #    El stock de productos (cantidades) NO se toca, pero su costo se pone en $0
+        #    para que la valorización arranque en cero hasta que se vuelva a cargar el costo.
         conn_execute(conn, "UPDATE productos SET costo = 0")
         conn_execute(conn, "DELETE FROM venta_items")
         conn_execute(conn, "DELETE FROM ventas")
@@ -707,6 +841,7 @@ def cierre_mensual():
         conn_execute(conn, "DELETE FROM activos")
         conn_execute(conn, "DELETE FROM pasivos")
         conn_execute(conn, "DELETE FROM costos_fijos")
+        conn_execute(conn, "DELETE FROM socios")
 
         conn.commit()
         release_db(conn)
