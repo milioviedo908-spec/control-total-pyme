@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Clientes / Pagos - {{ nombre_negocio }}{% endblock %}
+{% block header %}Clientes y Seguimiento de Pagos{% endblock %}
+{% block content %}
+
+<div class="grid grid-2" style="margin-bottom:20px;">
+    <div class="card metric">
+        <div class="label">Pendiente de cobro</div>
+        <div class="value" style="color:var(--rojo);">${{ "%.2f"|format(total_pendiente) }}</div>
+    </div>
+    <div class="card metric">
+        <div class="label">Cobrado</div>
+        <div class="value" style="color:var(--verde);">${{ "%.2f"|format(total_cobrado) }}</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <h3>Registrar servicio prestado</h3>
+    {% if not servicios %}
+    <p style="font-size:0.85rem; color:var(--texto-suave);">
+        Todavía no cargaste ningún servicio. Andá a <a href="{{ url_for('stock') }}" style="color:var(--acento); font-weight:600;">Stock</a>
+        y agregá uno con el tipo "Servicio" para poder registrar clientes acá.
+    </p>
+    {% else %}
+    <form method="POST">
+        <input type="hidden" name="accion" value="add">
+        <label>Servicio</label>
+        <select name="servicio_id" id="selector-servicio" onchange="autocompletar()" required>
+            {% for s in servicios %}
+            <option value="{{ s.id }}" data-precio="{{ s.precio }}" data-plan="{{ s.plan }}">{{ s.nombre }} (${{ "%.2f"|format(s.precio) }} / {{ s.plan }})</option>
+            {% endfor %}
+        </select>
+        <div class="grid grid-2" style="gap:10px;">
+            <div><label>Nombre del cliente</label><input type="text" name="cliente_nombre" required></div>
+            <div><label>Celular</label><input type="text" name="cliente_celular" placeholder="Opcional"></div>
+        </div>
+        <div class="grid grid-2" style="gap:10px;">
+            <div><label>Monto</label><input type="number" step="0.01" name="monto" id="input-monto" required></div>
+            <div>
+                <label>Plan</label>
+                <select name="plan" id="input-plan">
+                    <option value="Mensual">Mensual</option>
+                    <option value="Anual">Anual</option>
+                </select>
+            </div>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; margin-top:14px;">
+            <input type="checkbox" name="ya_pago" style="width:auto;">
+            Ya me pagó
+        </label>
+        <button type="submit" class="btn">Registrar</button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <h3>Pendientes de pago</h3>
+    {% if pendientes %}
+    <table>
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Celular</th>
+                <th>Servicio</th>
+                <th>Plan</th>
+                <th>Monto</th>
+                <th>Registrado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for p in pendientes %}
+            <tr>
+                <td>{{ p.cliente_nombre }}</td>
+                <td>{{ p.cliente_celular or '—' }}</td>
+                <td>{{ p.servicio_nombre }}</td>
+                <td>{{ p.plan }}</td>
+                <td>${{ "%.2f"|format(p.monto) }}</td>
+                <td>{{ p.fecha_registro }}</td>
+                <td style="display:flex; gap:6px;">
+                    <form method="POST"><input type="hidden" name="accion" value="marcar_pagado"><input type="hidden" name="id" value="{{ p.id }}"><button type="submit" class="btn sm">Marcar pagado</button></form>
+                    <form method="POST" onsubmit="return confirm('¿Eliminar este registro pendiente?');"><input type="hidden" name="accion" value="del"><input type="hidden" name="id" value="{{ p.id }}"><button type="submit" class="btn sm danger">Eliminar</button></form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="font-size:0.85rem; color:var(--texto-suave);">No hay pagos pendientes.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3>Pagos recibidos</h3>
+    {% if pagados %}
+    <table>
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Celular</th>
+                <th>Servicio</th>
+                <th>Plan</th>
+                <th>Monto</th>
+                <th>Fecha de pago</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for p in pagados %}
+            <tr>
+                <td>{{ p.cliente_nombre }}</td>
+                <td>{{ p.cliente_celular or '—' }}</td>
+                <td>{{ p.servicio_nombre }}</td>
+                <td>{{ p.plan }}</td>
+                <td>${{ "%.2f"|format(p.monto) }}</td>
+                <td>{{ p.fecha_pago }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="font-size:0.85rem; color:var(--texto-suave);">Todavía no hay pagos recibidos.</p>
+    {% endif %}
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function autocompletar() {
+    const sel = document.getElementById('selector-servicio');
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('input-monto').value = opt.dataset.precio;
+    document.getElementById('input-plan').value = opt.dataset.plan;
+}
+window.addEventListener('DOMContentLoaded', autocompletar);
+</script>
+{% endblock %}
