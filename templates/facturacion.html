@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Facturación - {{ nombre_negocio }}{% endblock %}
+{% block header %}Facturación por Producto{% endblock %}
+{% block content %}
+
+<div class="grid grid-3" style="margin-bottom:20px;">
+    <div class="card metric">
+        <div class="label">Facturación bruta total</div>
+        <div class="value">${{ "%.2f"|format(total_facturado) }}</div>
+    </div>
+    <div class="card metric">
+        <div class="label">Costo total</div>
+        <div class="value" style="color:var(--rojo);">${{ "%.2f"|format(total_costo) }}</div>
+    </div>
+    <div class="card metric">
+        <div class="label">Ganancia total</div>
+        <div class="value" style="color:var(--verde);">${{ "%.2f"|format(total_ganancia) }}</div>
+    </div>
+</div>
+
+{% if hay_faltantes %}
+<div class="flash error">
+    Algunas ventas fueron hechas antes de que la app guardara el costo por venta, así que su costo se
+    cuenta como $0 acá (la ganancia de esas filas está sobreestimada).
+</div>
+{% endif %}
+
+<div class="card">
+    <h3>Desglose por producto</h3>
+    {% if filas %}
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Unidades vendidas</th>
+                <th>Facturado</th>
+                <th>Costo</th>
+                <th>Ganancia</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for f in filas %}
+            <tr>
+                <td>
+                    {{ f.producto_nombre }}
+                    {% if f.unidades_sin_costo > 0 %}
+                        <span class="badge warn">{{ f.unidades_sin_costo }} u. sin costo</span>
+                    {% endif %}
+                </td>
+                <td>{{ f.unidades }}</td>
+                <td>${{ "%.2f"|format(f.facturado) }}</td>
+                <td>${{ "%.2f"|format(f.costo) }}</td>
+                <td>${{ "%.2f"|format(f.ganancia) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="font-weight:700;">
+                <td>Total</td>
+                <td></td>
+                <td>${{ "%.2f"|format(total_facturado) }}</td>
+                <td>${{ "%.2f"|format(total_costo) }}</td>
+                <td>${{ "%.2f"|format(total_ganancia) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+    {% else %}
+    <p style="color:var(--texto-suave); font-size:0.9rem;">Todavía no hay ventas registradas.</p>
+    {% endif %}
+</div>
+
+{% endblock %}
